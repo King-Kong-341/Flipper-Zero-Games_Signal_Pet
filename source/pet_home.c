@@ -419,11 +419,11 @@ static void wake_up(App* app) {
     app->home.sleep_fx_to_dark = false;
     fx_sleep(app, false);
     set_act(app, ActWake, 1600);
-    /* dream bonus: 1 XP per 10 minutes of sleep, up to 40 */
+    /* dream bonus: 1 XP per 20 minutes of sleep, up to 15 */
     uint32_t now = state_now_ts();
     uint32_t mins = s->sleep_ts && now > s->sleep_ts ? (now - s->sleep_ts) / 60 : 0;
-    uint32_t xp = mins / 10;
-    if(xp > 40) xp = 40;
+    uint32_t xp = mins / 20;
+    if(xp > 15) xp = 15;
     if(xp) {
         char buf[TOAST_LEN];
         snprintf(buf, sizeof(buf), "Sweet dreams! +%lu XP", (unsigned long)xp);
@@ -601,9 +601,9 @@ void home_update(App* app, uint32_t dt) {
             h->clean_t0 = 0;
             s->cleans++;
             char buf[TOAST_LEN];
-            snprintf(buf, sizeof(buf), "All clean! +%u XP", 5 * h->clean_n);
+            snprintf(buf, sizeof(buf), "All clean! +%u XP", 2 * h->clean_n);
             toast_show(app, buf, 0, 2000);
-            state_add_xp(app, 5 * h->clean_n);
+            state_add_xp(app, 2 * h->clean_n);
             s->noise = 0;
             if(!s->asleep) set_act(app, ActCheer, 900);
             pet_say(app, "So fresh and clean!");

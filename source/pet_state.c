@@ -17,7 +17,7 @@
 
 #define SAVE_PATH APP_DATA_PATH("signal_pet.sav")
 
-_Static_assert(offsetof(SaveData, unused_a) == SAVE_V1_SIZE, "v1 save layout changed");
+_Static_assert(offsetof(SaveData, games_day) == SAVE_V1_SIZE, "v1 save layout changed");
 _Static_assert(offsetof(SaveData, sleep_ts) == SAVE_V2_SIZE, "v2 save layout changed");
 #define STALE_SEC (20 * 60) /* the same signal is boring for 20 minutes */
 #define MAX_LEVEL 99
@@ -205,12 +205,38 @@ static uint8_t ir_rarity(const char* n) {
     return 2;
 }
 
+/* Rank = how hard a signal is to find: the source matters (every home has
+ * a TV remote, few people carry an iButton) and so does the protocol. */
+static const uint8_t rank_table[SrcCount][3] = {
+    {2, 3, 4}, /* Sub-GHz: Uncommon .. Epic */
+    {1, 2, 3}, /* NFC: Common .. Rare */
+    {2, 3, 4}, /* RFID: Uncommon .. Epic (animal chips) */
+    {1, 2, 3}, /* IR: Common .. Rare */
+    {3, 4, 5}, /* iButton: Rare .. Legendary */
+};
+
+static uint8_t rank_of(uint8_t src, uint8_t rarity) {
+    if(rarity < 1) rarity = 1;
+    if(rarity > 3) rarity = 3;
+    return rank_table[src % SrcCount][rarity - 1];
+}
+
+const char* rank_name(uint8_t rank) {
+    static const char* const names[6] = {"?", "Common", "Uncommon", "Rare", "Epic", "Legendary"};
+    return names[rank > 5 ? 0 : rank];
+}
+
+/* XP per rank: a new species, a new signal of a known species, a re-catch */
+static const uint8_t xp_species[6] = {0, 15, 30, 60, 100, 160};
+static const uint8_t xp_signal[6] = {0, 4, 8, 15, 25, 40};
+static const uint8_t xp_snack[6] = {0, 1, 1, 2, 2, 3};
+
 static void cat_add(Catalog* cat, uint8_t src, const char* name, uint8_t rarity) {
     if(cat->n >= MAX_CATALOG || !name) return;
     CatEntry* e = &cat->e[cat->n++];
     e->name = name;
     e->src = src;
-    e->rarity = rarity;
+    e->rarity = rank_of(src, rarity);
     e->hash = species_hash(src, name);
     cat->count[src]++;
 }
@@ -493,6 +519,22 @@ void state_check_evolve(App* app) {
     check_evolve(app);
 }
 
+/* Games can be replayed endlessly, so they only pay a little XP and at
+ * most GAME_XP_DAY per day. Returns what was actually given. */
+uint32_t state_game_xp(App* app, uint32_t want) {
+    SaveData* s = app->save;
+    uint32_t day = state_now_ts() / 86400;
+    if(s->games_day != day) {
+        s->games_day = day;
+        s->games_xp = 0;
+    }
+    uint32_t left = s->games_xp < GAME_XP_DAY ? GAME_XP_DAY - s->games_xp : 0;
+    uint32_t give = want < left ? want : left;
+    s->games_xp += give;
+    state_add_xp(app, give);
+    return give;
+}
+
 /* ---------------------------------------------------------- badges */
 
 static void badge_give(App* app, uint8_t i) {
@@ -571,6 +613,7 @@ void catch_digest(App* app, const Catch* c, CatchState* out) {
     int16_t ci = catalog_find(app->cat, sh);
     out->c = *c;
     out->rarity = ci >= 0 ? app->cat->e[ci].rarity : 2;
+    if(out->rarity < 1 || out->rarity > 5) out->rarity = 2;
     out->dex_no = ci >= 0 ? (int16_t)(ci - app->cat->first[c->src] + 1) : 0;
 
     SpeciesRec* sp = species_get(s, sh);
@@ -581,16 +624,16 @@ void catch_digest(App* app, const Catch* c, CatchState* out) {
     out->g_joy = 0;
     if(!sp) {
         out->kind = CatchNewSpecies;
-        out->g_xp = 30 + 15 * r;
+        out->g_xp = xp_species[r];
     } else if(!mr) {
         out->kind = CatchNewSignal;
-        out->g_xp = 12 + 6 * r;
+        out->g_xp = xp_signal[r];
     } else if(now - mr->last_ts < STALE_SEC) {
         out->kind = CatchStale;
         out->g_xp = 0;
     } else {
         out->kind = CatchSnack;
-        out->g_xp = 4;
+        out->g_xp = xp_snack[r];
     }
     /* a messy room spoils the appetite: half XP */
     out->messy = s->noise >= 3 && out->g_xp > 0;

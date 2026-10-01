@@ -1,11 +1,15 @@
 /*
- * Mini games. Free to play, they pay out XP.
+ * Mini games.
  *
  *   Byte Catch  move left/right, catch falling data packets, golden
  *                 packets are worth 5, static costs a life. Speeds up.
  *   Tune In       an oscilloscope: match your wave to the dotted target
  *                 wave (Left/Right = frequency, Up/Down = amplitude).
  *                 5 rounds against the clock.
+ *   Freq Hopper   hop between three bands, grab packets, dodge noise.
+ *
+ * Games can be replayed forever, so they pay only a little XP (max 5 per
+ * round, GAME_XP_DAY per day); rare signals are where the big XP is.
  */
 #include "pet.h"
 
@@ -19,28 +23,58 @@ static uint32_t rnd(uint32_t n) {
     return furi_hal_random_get() % n;
 }
 
-static const char* const game_names[2] = {"Byte Catch", "Tune In"};
-
 /* ================================================================ picker */
+
+#define GAMES 3
+
+static const char* const game_names[GAMES] = {"Byte Catch", "Tune In", "Freq Hopper"};
+static const char* const game_desc[GAMES] = {
+    "Catch packets, dodge static", "Match the wave in time", "Hop bands, dodge the noise"};
+static const char* const game_titles[GAMES] = {"BYTE CATCH", "TUNE IN", "FREQ HOPPER"};
+
+static Scene game_scene(uint8_t game) {
+    static const Scene sc[GAMES] = {SceneGameCatch, SceneGameTune, SceneGameHop};
+    return sc[game % GAMES];
+}
+
+static uint32_t game_best(App* app, uint8_t game) {
+    SaveData* s = app->save;
+    if(game == 0) return s->best_catch;
+    if(game == 1) return s->best_tune;
+    return s->best_hop;
+}
+
+static uint32_t game_xp_today(App* app) {
+    SaveData* s = app->save;
+    return s->games_day == state_now_ts() / 86400 ? s->games_xp : 0;
+}
 
 void playpick_enter(App* app) {
     parts_clear(app);
+    if(app->play.sel >= GAMES) app->play.sel = 0;
 }
 
 void playpick_input(App* app, InputEvent* ev) {
     PlayState* g = &app->play;
-    if(ev->type != InputTypeShort) return;
+    if(ev->type != InputTypeShort && ev->type != InputTypeRepeat) return;
     switch(ev->key) {
+    case InputKeyUp:
     case InputKeyLeft:
+        g->sel = (g->sel + GAMES - 1) % GAMES;
+        fx_click(app);
+        break;
+    case InputKeyDown:
     case InputKeyRight:
-        g->sel ^= 1;
+        g->sel = (g->sel + 1) % GAMES;
         fx_click(app);
         break;
     case InputKeyOk:
+        if(ev->type != InputTypeShort) break;
         fx_click(app);
-        app_goto(app, g->sel ? SceneGameTune : SceneGameCatch, TransBlinds);
+        app_goto(app, game_scene(g->sel), TransBlinds);
         break;
     case InputKeyBack:
+        if(ev->type != InputTypeShort) break;
         fx_back(app);
         app_goto(app, SceneHome, TransBlinds);
         break;
@@ -49,63 +83,54 @@ void playpick_input(App* app, InputEvent* ev) {
     }
 }
 
-static void preview_catch(App* app, Canvas* c, int32_t x, int32_t y) {
+/* little animated icon per game, drawn in a 9x9 box */
+static void game_icon(App* app, Canvas* c, uint8_t game, int32_t x, int32_t y) {
     uint32_t t = app->now;
-    for(int32_t k = 0; k < 3; k++) {
-        int32_t py = y + (int32_t)((t / 40 + k * 6) % 16) - 4;
-        int32_t px = x + 8 + k * 17;
-        if(py >= y && py < y + 9) gfx_bmp(c, px, py, k == 1 ? &bmp_pkt_gold : &bmp_pkt);
-    }
-    /* a tiny pet catching them */
-    int32_t bx = x + 30 + (gfx_sin((int32_t)(t / 45)) * 16) / 64;
-    canvas_draw_circle(c, bx, y + 12, 4);
-    canvas_draw_dot(c, bx - 2, y + 11);
-    canvas_draw_dot(c, bx + 2, y + 11);
-    canvas_draw_line(c, bx, y + 8, bx, y + 6);
-}
-
-static void preview_tune(App* app, Canvas* c, int32_t x, int32_t y) {
-    uint32_t t = app->now;
-    int32_t mid = y + 8;
-    int32_t ph = (int32_t)(t / 25);
-    int32_t lx = 0, ly = 0;
-    for(int32_t i = 0; i <= 50; i++) {
-        int32_t a = i * 64 * 2 / 50 + ph;
-        int32_t yy = mid - gfx_sin(a) * 6 / 64;
-        if(i & 1) canvas_draw_dot(c, x + 5 + i, mid - gfx_sin(a + 6) * 6 / 64);
-        if(i) canvas_draw_line(c, x + 5 + lx, ly, x + 5 + i, yy);
-        lx = i;
-        ly = yy;
+    if(game == 0) {
+        int32_t py = y + (int32_t)((t / 120) % 5) - 1;
+        gfx_bmp(c, x + 1, py, &bmp_pkt);
+    } else if(game == 1) {
+        int32_t ph = (int32_t)(t / 30);
+        for(int32_t i = 0; i < 9; i++)
+            canvas_draw_dot(c, x + i, y + 4 - gfx_sin(i * 8 + ph) * 3 / 64);
+    } else {
+        int32_t lane = (int32_t)((t / 400) % 3);
+        for(int32_t i = 0; i < 9; i += 2) {
+            canvas_draw_dot(c, x + i, y);
+            canvas_draw_dot(c, x + i, y + 8);
+        }
+        canvas_draw_box(c, x + 3, y + 1 + lane * 2 + 1, 3, 2);
     }
 }
 
 void playpick_draw(App* app, Canvas* c) {
     PlayState* g = &app->play;
-    SaveData* s = app->save;
     gfx_title(c, "PLAY");
     canvas_set_font(c, FontSecondary);
-    for(uint8_t i = 0; i < 2; i++) {
-        int32_t x = 2 + i * 64, y = 14, w = 60, h = 41;
+    char buf[32];
+    for(uint8_t i = 0; i < GAMES; i++) {
+        int32_t y = 14 + i * 11;
         bool sel = g->sel == i;
-        canvas_draw_rframe(c, x, y, w, h, 3);
-        if(sel) canvas_draw_rframe(c, x + 1, y + 1, w - 2, h - 2, 2);
-        if(i == 0)
-            preview_catch(app, c, x, y + 2);
-        else
-            preview_tune(app, c, x, y + 2);
         if(sel) {
-            canvas_draw_rbox(c, x + 3, y + 20, w - 6, 10, 2);
+            canvas_draw_rbox(c, 0, y, 128, 11, 2);
             canvas_set_color(c, ColorWhite);
         }
-        gfx_str_center(c, x + w / 2, y + 28, game_names[i]);
+        game_icon(app, c, i, 3, y + 1);
+        canvas_draw_str(c, 16, y + 8, game_names[i]);
+        snprintf(buf, sizeof(buf), "Best %lu", (unsigned long)game_best(app, i));
+        gfx_str_right(c, 125, y + 8, buf);
         canvas_set_color(c, ColorBlack);
-        char buf[48];
-        snprintf(buf, sizeof(buf), "Best %lu", (unsigned long)(i ? s->best_tune : s->best_catch));
-        gfx_str_center(c, x + w / 2, y + 38, buf);
     }
-    gfx_bmp(c, 2, 58, &bmp_star5);
-    canvas_draw_str(c, 9, 63, "Games give XP!");
-    gfx_button_hint(c, 99, 63, &bmp_btn_ok, "Play");
+    /* how much game XP is left today */
+    uint32_t today = game_xp_today(app);
+    gfx_bmp(c, 2, 49, &bmp_star5);
+    if(today >= GAME_XP_DAY)
+        snprintf(buf, sizeof(buf), "Game XP done for today");
+    else
+        snprintf(buf, sizeof(buf), "Game XP today: %lu/%u", (unsigned long)today, GAME_XP_DAY);
+    canvas_draw_str(c, 9, 54, buf);
+    gfx_bmp(c, 2, 55, &bmp_info);
+    canvas_draw_str(c, 10, 62, game_desc[g->sel % GAMES]);
 }
 
 /* ================================================================ common */
@@ -127,29 +152,26 @@ static void finish_game(App* app, uint16_t result) {
     if(g->finished) return;
     g->finished = true;
     g->result = result;
-    g->best = false;
+    g->best = result > 0 && result > game_best(app, g->game);
+    uint32_t want = 1;
     if(g->game == 0) {
-        if(result > s->best_catch) {
-            s->best_catch = result;
-            g->best = result > 0;
-        }
-        g->g_xp = 5 + result;
-        if(g->g_xp > 40) g->g_xp = 40;
-    } else {
-        if(result > s->best_tune) {
-            s->best_tune = result;
-            g->best = result > 0;
-        }
-        g->g_xp = 5 + g->locked * 6;
-        if(g->locked >= TUNE_ROUNDS) {
+        if(g->best) s->best_catch = result;
+        want = 1 + result / 8;
+    } else if(g->game == 1) {
+        if(g->best) s->best_tune = result;
+        want = 1 + g->locked / 2 + (g->locked >= TUNE_ROUNDS ? 1 : 0);
+        if(g->locked >= TUNE_ROUNDS && !(s->badges & (1u << 13))) {
             /* perfect run badge */
-            if(!(s->badges & (1u << 13))) {
-                s->badges |= 1u << 13;
-                app->new_badges |= 1u << 13;
-            }
+            s->badges |= 1u << 13;
+            app->new_badges |= 1u << 13;
         }
+    } else {
+        if(g->best) s->best_hop = result;
+        want = 1 + result / 12;
     }
-    state_add_xp(app, g->g_xp);
+    if(want > 5) want = 5; /* games are endless: keep the XP small */
+    g->g_xp = (int16_t)state_game_xp(app, want);
+    g->capped = g->g_xp < (int16_t)want;
     state_badges_check(app);
     state_save(app);
     if(g->best)
@@ -429,6 +451,181 @@ void gtune_draw(App* app, Canvas* c) {
     slider(c, 93, (uint8_t)((g->p_amp - 2) / 2), 6);
 }
 
+/* ================================================================ freq hopper */
+
+/* Three radio bands as lanes. Your pet hops between them (Up/Down),
+ * collects data packets and dodges bursts of noise coming from the right.
+ * Everything speeds up the longer you survive. */
+#define HOP_LANES 3
+#define HOP_PET_X 28
+
+static const uint8_t hop_lane_y[HOP_LANES] = {21, 36, 51};
+static const char* const hop_lane_name[HOP_LANES] = {"315", "433", "868"};
+
+void hop_enter(App* app) {
+    start_game(app, 2);
+    PlayState* g = &app->play;
+    g->lives = 3;
+    g->lane = 1;
+    g->lane_y = hop_lane_y[1];
+    g->next_spawn = app->now + 900;
+    g->dist_t = app->now;
+}
+
+void hop_input(App* app, InputEvent* ev) {
+    PlayState* g = &app->play;
+    if(g->over_t0 || g->finished) return;
+    if(ev->type != InputTypeShort && ev->type != InputTypeRepeat && ev->type != InputTypePress) return;
+    if(ev->type == InputTypePress && (ev->key == InputKeyUp || ev->key == InputKeyDown)) {
+        if(ev->key == InputKeyUp && g->lane > 0) g->lane--;
+        if(ev->key == InputKeyDown && g->lane < HOP_LANES - 1) g->lane++;
+        fx_click(app);
+    } else if(ev->key == InputKeyBack && ev->type == InputTypeShort) {
+        g->over_t0 = app->now;
+        g->lives = 0;
+    }
+}
+
+static float hop_speed(App* app) {
+    float s = 38.0f + (float)(app->now - app->play.t0) / 1000.0f * 1.6f;
+    return s > 115.0f ? 115.0f : s;
+}
+
+static void hop_spawn(App* app) {
+    PlayState* g = &app->play;
+    /* one or two things per column, never noise on all three lanes */
+    uint8_t n = rnd(100) < 35 ? 2 : 1;
+    uint8_t first = rnd(HOP_LANES);
+    uint8_t noise = 0;
+    for(uint8_t k = 0; k < n; k++) {
+        uint8_t lane = (first + k) % HOP_LANES;
+        for(uint8_t i = 0; i < GAME_ITEMS; i++) {
+            FallItem* it = &g->items[i];
+            if(it->alive) continue;
+            uint32_t r = rnd(100);
+            it->kind = r < 10 ? 1 : (r < 58 ? 2 : 0);
+            if(it->kind == 2 && ++noise >= HOP_LANES) it->kind = 0;
+            it->x = 128;
+            it->y = lane;
+            it->alive = true;
+            break;
+        }
+    }
+}
+
+void hop_update(App* app, uint32_t dt) {
+    PlayState* g = &app->play;
+    float s = (float)dt / 1000.0f;
+    if(g->finished) return;
+    if(g->over_t0) {
+        if(app->now - g->over_t0 > 700) finish_game(app, g->score);
+        return;
+    }
+    /* smooth hop between lanes */
+    float target = hop_lane_y[g->lane];
+    float k = s * 18.0f;
+    if(k > 1) k = 1;
+    g->lane_y += (target - g->lane_y) * k;
+
+    float v = hop_speed(app);
+    if((int32_t)(app->now - g->next_spawn) >= 0) {
+        hop_spawn(app);
+        int32_t gap = (int32_t)(26000.0f / v);
+        g->next_spawn = app->now + gap + rnd(gap / 2 + 1);
+    }
+    /* distance bonus: 1 point every 5 seconds alive */
+    if(app->now - g->dist_t >= 5000) {
+        g->dist_t += 5000;
+        g->score++;
+    }
+
+    bool settled = g->lane_y > target - 4 && g->lane_y < target + 4;
+    for(uint8_t i = 0; i < GAME_ITEMS; i++) {
+        FallItem* it = &g->items[i];
+        if(!it->alive) continue;
+        it->x -= v * s;
+        float dx = it->x + 3 - HOP_PET_X;
+        if(settled && (uint8_t)it->y == g->lane && dx > -7 && dx < 7) {
+            it->alive = false;
+            int32_t iy = hop_lane_y[(uint8_t)it->y];
+            if(it->kind == 2) {
+                g->lives = g->lives ? g->lives - 1 : 0;
+                g->hurt_t0 = app->now;
+                fx_hurt(app);
+                parts_burst(app, PartBit, HOP_PET_X + 4, iy, 6, 40, true);
+                if(!g->lives) g->over_t0 = app->now;
+            } else {
+                g->score += it->kind == 1 ? 3 : 1;
+                fx_pickup(app, it->kind == 1);
+                parts_burst(app, it->kind == 1 ? PartStar : PartCrumb, HOP_PET_X + 4, iy, 4, 30, it->kind != 1);
+            }
+        } else if(it->x < -8) {
+            it->alive = false;
+        }
+    }
+}
+
+static void hop_pet(App* app, Canvas* c, int32_t x, int32_t y) {
+    PlayState* g = &app->play;
+    bool hurt = (g->hurt_t0 && app->now - g->hurt_t0 < 500) || g->lives == 0;
+    canvas_set_color(c, ColorWhite);
+    canvas_draw_disc(c, x, y, 5);
+    canvas_set_color(c, ColorBlack);
+    canvas_draw_circle(c, x, y, 5);
+    if(hurt) {
+        canvas_draw_line(c, x - 3, y - 2, x - 1, y);
+        canvas_draw_line(c, x - 3, y, x - 1, y - 2);
+        canvas_draw_line(c, x + 1, y - 2, x + 3, y);
+        canvas_draw_line(c, x + 1, y, x + 3, y - 2);
+    } else {
+        canvas_draw_box(c, x - 2, y - 2, 1, 2);
+        canvas_draw_box(c, x + 2, y - 2, 1, 2);
+        canvas_draw_dot(c, x - 1, y + 2);
+        canvas_draw_dot(c, x, y + 3);
+        canvas_draw_dot(c, x + 1, y + 2);
+    }
+    /* antenna leans back while hopping */
+    int32_t lean = (int32_t)(hop_lane_y[g->lane] - g->lane_y) / 4;
+    canvas_draw_line(c, x, y - 5, x - 1, y - 7 - lean);
+    canvas_draw_dot(c, x - 1, y - 8 - lean);
+}
+
+void hop_draw(App* app, Canvas* c) {
+    PlayState* g = &app->play;
+    canvas_set_font(c, FontSecondary);
+    char buf[24];
+    snprintf(buf, sizeof(buf), "Score %u", g->score);
+    canvas_draw_str(c, 1, 8, buf);
+    for(uint8_t i = 0; i < 3; i++)
+        gfx_bmp(c, 109 + i * 6, 2, i < g->lives ? &bmp_heart5 : &bmp_heart5_empty);
+    for(int32_t x = 0; x < 128; x += 2)
+        canvas_draw_dot(c, x, 10);
+
+    /* lane markers scroll with the speed */
+    int32_t off = (int32_t)((float)(app->now - g->t0) * hop_speed(app) / 1000.0f) % 8;
+    for(int32_t x = 20 - off; x < 128; x += 8) {
+        if(x < 20) continue;
+        gfx_hline(c, x, 28, 4);
+        gfx_hline(c, x, 43, 4);
+    }
+    for(uint8_t l = 0; l < HOP_LANES; l++)
+        canvas_draw_str(c, 1, hop_lane_y[l] + 3, hop_lane_name[l]);
+    gfx_vline(c, 19, 12, 51);
+
+    for(uint8_t i = 0; i < GAME_ITEMS; i++) {
+        FallItem* it = &g->items[i];
+        if(!it->alive) continue;
+        int32_t x = (int32_t)it->x, y = hop_lane_y[(uint8_t)it->y];
+        if(x < 20 || x > 127) continue;
+        const Bmp* b = it->kind == 1 ? &bmp_pkt_gold :
+                       (it->kind == 2 ? (((app->now / 120) & 1) ? &bmp_glitch1 : &bmp_glitch2) : &bmp_pkt);
+        gfx_bmp(c, x, y - b->h / 2, b);
+    }
+    hop_pet(app, c, HOP_PET_X, (int32_t)(g->lane_y + 0.5f));
+    parts_draw(app, c);
+    if(g->hurt_t0 && app->now - g->hurt_t0 < 90) gfx_invert(c, 0, 11, 128, 53);
+}
+
 /* ================================================================ game over */
 
 void gover_input(App* app, InputEvent* ev) {
@@ -436,7 +633,7 @@ void gover_input(App* app, InputEvent* ev) {
     if(ev->type != InputTypeShort) return;
     if(ev->key == InputKeyOk) {
         fx_click(app);
-        app_goto(app, g->game ? SceneGameTune : SceneGameCatch, TransBlinds);
+        app_goto(app, game_scene(g->game), TransBlinds);
     } else if(ev->key == InputKeyBack) {
         fx_back(app);
         app_goto(app, SceneHome, TransBlinds);
@@ -445,7 +642,7 @@ void gover_input(App* app, InputEvent* ev) {
 
 void gover_draw(App* app, Canvas* c) {
     PlayState* g = &app->play;
-    gfx_title(c, g->game ? "TUNE IN" : "BYTE CATCH");
+    gfx_title(c, game_titles[g->game % GAMES]);
     char buf[48];
     snprintf(buf, sizeof(buf), "%u", g->result);
     canvas_set_font(c, FontBigNumbers);
@@ -462,15 +659,14 @@ void gover_draw(App* app, Canvas* c) {
             gfx_str_center(c, 64, 45, "NEW BEST!");
         }
     } else {
-        snprintf(
-            buf,
-            sizeof(buf),
-            "Best %lu",
-            (unsigned long)(g->game ? app->save->best_tune : app->save->best_catch));
+        snprintf(buf, sizeof(buf), "Best %lu", (unsigned long)game_best(app, g->game));
         gfx_str_center(c, 64, 45, buf);
     }
     gfx_bmp(c, 2, 58, &bmp_star5);
-    snprintf(buf, sizeof(buf), "+%d XP", g->g_xp);
+    if(g->capped && g->g_xp == 0)
+        snprintf(buf, sizeof(buf), "Daily XP max");
+    else
+        snprintf(buf, sizeof(buf), "+%d XP", g->g_xp);
     canvas_draw_str(c, 9, 63, buf);
     gfx_button_hint(c, 89, 63, &bmp_btn_ok, "Again");
 }

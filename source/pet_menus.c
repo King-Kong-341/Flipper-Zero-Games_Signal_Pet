@@ -334,7 +334,7 @@ void dex_draw(App* app, Canvas* c) {
         if(sp) {
             char nm[28];
             snprintf(nm, sizeof(nm), "%s", e->name);
-            gfx_fit_str(c, nm, sizeof(nm), 80);
+            gfx_fit_str(c, nm, sizeof(nm), 116 - 6 * e->rarity - 17 - 2);
             canvas_draw_str(c, 17, y + 8, nm);
             for(uint8_t s = 0; s < e->rarity; s++)
                 gfx_bmp(c, 116 - s * 6, y + 2, &bmp_star5);
@@ -393,8 +393,8 @@ void dexd_draw(App* app, Canvas* c) {
 
     int32_t x = 38;
     canvas_draw_str(c, x, 23, source_names[e->src]);
-    canvas_draw_str(c, x, 33, "Rarity");
-    gfx_stars(c, x + 30, 28, e->rarity);
+    gfx_stars(c, 97, 18, e->rarity);
+    canvas_draw_str(c, x, 33, rank_name(e->rarity));
     if(!sp) {
         canvas_draw_str(c, x, 43, "Not found yet!");
         canvas_draw_str(c, x, 53, "Keep hunting...");
@@ -534,7 +534,13 @@ static void stats_records(App* app, Canvas* c) {
             snprintf(buf, sizeof(buf), "%u/%u", pet_tier(s->level), TIER_MAX);
             break;
         case 3:
-            snprintf(buf, sizeof(buf), "%lu / %lu", (unsigned long)s->best_catch, (unsigned long)s->best_tune);
+            snprintf(
+                buf,
+                sizeof(buf),
+                "%lu/%lu/%u",
+                (unsigned long)s->best_catch,
+                (unsigned long)s->best_tune,
+                s->best_hop);
             break;
         default: {
             uint32_t d = state_age_days(app);
@@ -639,7 +645,7 @@ static const char* const set_help[SetCount] = {
     "Keep the screen bright",
     "All = every Sub-GHz band",
     "Type a new name",
-    "Quick guide, 7 pages",
+    "Quick guide, 8 pages",
     "Start over with a new egg",
 };
 
@@ -821,11 +827,12 @@ typedef struct {
 static const HelpPage help_pages[] = {
     {"WELCOME", {"Your pet lives on radio", "signals. Hunt them with", "Flipper's antennas to", "feed it and help it grow."}},
     {"HUNTING", {"Sub-GHz: keys, gates", "NFC: bank & transit cards", "RFID: door fobs, chips", "IR: remotes  iButton: keys"}},
-    {"CARE", {"No hunger, it can't die.", "Signals + games = XP.", "Static halves XP: Clean!", "Sleep gives dream XP."}},
+    {"CARE", {"No hunger, it can't die.", "Rare signals = big XP!", "Static halves XP: Clean!", "Games: max 30 XP a day."}},
+    {"RANKS", {"New species gives XP:", "Common 15  Uncommon 30", "Rare 60     Epic 100", "Legendary 160 XP!"}},
     {"GROWING", {"Lv 5: teen, Lv 10: adult.", "Its diet decides which", "of 6 forms it becomes.", "New moves up to Lv 99!"}},
     {"EXTRAS", {"Band All sweeps every", "Sub-GHz band for you.", "CC1101 board on GPIO:", "used for Sub-GHz hunts"}},
     {"CONTROLS", {"Left/Right: pick in dock", "OK: open    Up: pet it", "Down: chat  Back: exit", "Logbook: every catch"}},
-    {"ABOUT", {"Signal Pet v1.0", "Made by King-Kong-341", "for the Flipper Zero.", "Happy hunting!"}},
+    {"ABOUT", {"Signal Pet v1.1", "Made by King-Kong-341", "for the Flipper Zero.", "Happy hunting!"}},
 };
 #define HELP_N (sizeof(help_pages) / sizeof(help_pages[0]))
 
@@ -1017,8 +1024,8 @@ void logd_draw(App* app, Canvas* c) {
 
     int32_t x = 38;
     canvas_draw_str(c, x, 23, source_names[e->src % SrcCount]);
+    gfx_stars(c, 97, 18, e->rarity);
     canvas_draw_str(c, x, 33, kind_names[e->kind % 4]);
-    gfx_stars(c, 104, 28, e->rarity);
     snprintf(buf, sizeof(buf), "%s", e->detail[0] ? e->detail : "-");
     gfx_fit_str(c, buf, sizeof(buf), 127 - x);
     canvas_draw_str(c, x, 43, buf);

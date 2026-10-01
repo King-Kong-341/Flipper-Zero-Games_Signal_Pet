@@ -208,10 +208,11 @@ typedef struct {
     SpeciesRec species[MAX_SPECIES];
     SpecimenRec specimens[MAX_SPECIMENS];
     /* ---- v2 ---- */
-    uint32_t unused_a; /* kept so older saves still load */
-    uint32_t unused_b;
+    uint32_t games_day; /* day number of games_xp (daily XP limit for games) */
+    uint32_t games_xp;
     uint8_t gadgets; /* bit 0: external CC1101 module seen */
-    uint8_t pad2[3];
+    uint8_t pad2;
+    uint16_t best_hop;
     /* ---- v3 ---- */
     uint32_t sleep_ts; /* when it fell asleep (dream bonus) */
     uint32_t last_catch_ts;
@@ -228,7 +229,7 @@ typedef struct {
     const char* name;
     uint32_t hash;
     uint8_t src;
-    uint8_t rarity; /* 1..3 */
+    uint8_t rarity; /* rank 1..5: Common .. Legendary */
 } CatEntry;
 
 typedef struct {
@@ -354,6 +355,7 @@ typedef enum {
     ScenePlayPick,
     SceneGameCatch,
     SceneGameTune,
+    SceneGameHop,
     SceneGameOver,
     SceneDex,
     SceneDexDetail,
@@ -530,7 +532,12 @@ typedef struct {
     uint32_t lock_t0;
     uint8_t locked;
     float phase;
+    /* freq hopper */
+    uint8_t lane;
+    float lane_y;
+    uint32_t dist_t;
     /* result */
+    bool capped; /* daily game XP limit reached */
     bool finished;
     uint16_t result;
     bool best;
@@ -637,6 +644,9 @@ void state_save(App* app);
 void state_catch_up(App* app);
 void state_tick_minute(App* app);
 void state_add_xp(App* app, uint32_t xp);
+uint32_t state_game_xp(App* app, uint32_t want); /* applies the daily limit */
+const char* rank_name(uint8_t rank);
+#define GAME_XP_DAY 30
 void state_check_evolve(App* app);
 void state_add(int32_t* stat, int32_t milli);
 uint32_t state_xp_need(uint8_t level);
@@ -792,6 +802,10 @@ void gcatch_enter(App* app);
 void gcatch_input(App* app, InputEvent* ev);
 void gcatch_update(App* app, uint32_t dt);
 void gcatch_draw(App* app, Canvas* c);
+void hop_enter(App* app);
+void hop_input(App* app, InputEvent* ev);
+void hop_update(App* app, uint32_t dt);
+void hop_draw(App* app, Canvas* c);
 void gtune_enter(App* app);
 void gtune_input(App* app, InputEvent* ev);
 void gtune_update(App* app, uint32_t dt);

@@ -135,7 +135,7 @@ void gfx_bar(Canvas* c, int32_t x, int32_t y, int32_t w, int32_t h, uint8_t pct)
 }
 
 void gfx_stars(Canvas* c, int32_t x, int32_t y, uint8_t rarity) {
-    for(uint8_t i = 0; i < 3; i++) {
+    for(uint8_t i = 0; i < 5; i++) {
         gfx_bmp(c, x + i * 6, y, i < rarity ? &bmp_star5 : &bmp_star5_empty);
     }
 }

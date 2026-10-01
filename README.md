@@ -75,9 +75,19 @@ The bottom bar: **Hunt · Play · Clean · Sleep · Signal Dex · Logbook · Sta
 | **Infrared** | any TV or AC remote | aim at the **top** and press a button |
 | **iButton** | intercom keys (Dallas, Cyfral, Metakom) | touch the iButton contacts |
 
-- **New species** (a signal type you never had) gives the most XP, a **new
-  signal** of a known type gives a bit less. The very same signal again
-  within 20 minutes is "old news".
+- Every signal type has a **rank** — the harder it is to find, the more XP:
+
+  | Rank | Examples | New species | New signal |
+  |---|---|:-:|:-:|
+  | ★ Common | TV remotes (NEC, Samsung), bank cards, NTAG stickers | 15 XP | 4 XP |
+  | ★★ Uncommon | rarer IR remotes, DESFire, EM4100 fobs, simple Sub-GHz remotes | 30 XP | 8 XP |
+  | ★★★ Rare | FeliCa, rarer 125 kHz tags, most Sub-GHz remotes | 60 XP | 15 XP |
+  | ★★★★ Epic | rolling-code car keys (KeeLoq …), animal microchips, Dallas iButtons | 100 XP | 25 XP |
+  | ★★★★★ Legendary | Cyfral and Metakom iButtons | 160 XP | 40 XP |
+
+  A **new species** is a signal type you never had, a **new signal** is
+  another remote/card of a known type. Catching the same one again later
+  gives 1–3 XP, within 20 minutes it's "old news".
 - **Sub-GHz "All" band:** the radio has one receiver, so it sniffs the signal
   strength of all 54 standard frequencies in a fast loop (about 0.2 s for
   all of them) and jumps onto any channel that lights up to decode it.
@@ -89,7 +99,9 @@ The bottom bar: **Hunt · Play · Clean · Sleep · Signal Dex · Logbook · Sta
 
 ### 🌱 Growing
 
-- XP comes from new signals, the mini games, cleaning and sleeping.
+- XP comes mostly from **new and rare signals**. The mini games, cleaning
+  and sleeping give a little extra — games at most 5 XP per round and
+  30 XP per day, because they can be replayed forever.
 - **Level 5:** teen. **Level 10:** adult — *Wavern* (Sub-GHz), *Tapkin* (NFC),
   *Coilbit* (RFID), *Irix* (IR), *Keybo* (iButton) or *Omnix* (a balanced diet).
 - **New moves** at levels 3, 5, 8, 10, 15, 20, 30, 45, 70 and 99: Radar Ping,
@@ -110,8 +122,10 @@ The bottom bar: **Hunt · Play · Clean · Sleep · Signal Dex · Logbook · Sta
   lights off when your pet sleeps
 - 📖 **Signal Dex** with every signal type your firmware can decode, **Logbook** of the last 40
   catches with time and ID, **16 badges**, stats
-- 🎮 **2 mini games:** *Byte Catch* (catch falling packets, dodge static)
-  and *Tune In* (match your wave to the target on an oscilloscope)
+- 🎮 **3 mini games:** *Byte Catch* (catch falling packets, dodge static),
+  *Tune In* (match your wave to the target on an oscilloscope) and
+  *Freq Hopper* (hop between three radio bands, grab packets, dodge noise)
+- ⭐ **5 ranks** from Common to Legendary — rare signals are worth the hunt
 - 🔊 **Sound, vibration & LED** — every source has its own LED colour
 - ⚙️ **Settings** with a one-line explanation for every option
 - 💾 Everything is saved on the SD card
@@ -121,13 +135,15 @@ The bottom bar: **Hunt · Play · Clean · Sleep · Signal Dex · Logbook · Sta
 | | | |
 |:-:|:-:|:-:|
 | <img src="images/home.png"> | <img src="images/hunt_subghz.png"> | <img src="images/catch_card.png"> |
-| The room | Sub-GHz hunt (all bands) | A new species! |
+| The room | Sub-GHz hunt (all bands) | A legendary catch! |
 | <img src="images/hunt_nfc.png"> | <img src="images/logbook.png"> | <img src="images/signal_dex.png"> |
 | NFC hunt | Logbook | Signal Dex |
 | <img src="images/profile.png"> | <img src="images/name_keyboard.png"> | <img src="images/hatch.png"> |
 | A level 99 legend | Name keyboard | Hatching the egg |
-| <img src="images/games.png"> | <img src="images/tune_in.png"> | <img src="images/gpio_board.png"> |
-| Mini games | Tune In | External board found |
+| <img src="images/games.png"> | <img src="images/freq_hopper.png"> | <img src="images/tune_in.png"> |
+| Mini games | Freq Hopper | Tune In |
+| <img src="images/gpio_board.png"> | | |
+| External board found | | |
 
 ## 🛠 Build it yourself
 

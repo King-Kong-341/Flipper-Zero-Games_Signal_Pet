@@ -625,7 +625,7 @@ static void draw_card(App* app, Canvas* c, int32_t y) {
     else
         snprintf(no, sizeof(no), "#??");
     canvas_draw_str(c, x + 14, y + 31, no);
-    gfx_stars(c, x + w - 21, y + 26, cs->rarity);
+    gfx_stars(c, x + w - 33, y + 26, cs->rarity);
 
     if(cs->kind == CatchStale) {
         gfx_str_center(c, x + w / 2, y + 41, "Just ate that one!");
@@ -654,7 +654,7 @@ static void draw_card(App* app, Canvas* c, int32_t y) {
         /* progress to the next level */
         SaveData* s = app->save;
         uint32_t need = state_xp_need(s->level);
-        gfx_bar(c, x + 46, y + 45, 37, 5, (uint8_t)(s->level >= 99 ? 100 : s->xp * 100 / (need ? need : 1)));
+        gfx_bar(c, x + 49, y + 45, 34, 5, (uint8_t)(s->level >= 99 ? 100 : s->xp * 100 / (need ? need : 1)));
     }
 }
 
