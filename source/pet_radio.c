@@ -198,6 +198,7 @@ static void subghz_cb(SubGhzReceiver* receiver, SubGhzProtocolDecoderBase* decod
             snprintf(c.detail, sizeof(c.detail), "%.*s", (int)n, d);
         }
         c.id_hash = h;
+        c.freq = r->freq;
         set_pending(r, &c);
     }
     subghz_receiver_reset(receiver);

@@ -229,7 +229,8 @@ typedef struct {
     const char* name;
     uint32_t hash;
     uint8_t src;
-    uint8_t rarity; /* rank 1..5: Common .. Legendary */
+    uint8_t rarity; /* rank 1..5: Common .. Legendary, from xp */
+    uint8_t xp; /* XP for a new species of this type */
 } CatEntry;
 
 typedef struct {
@@ -255,6 +256,7 @@ typedef struct {
     char proto[24]; /* protocol name as in the catalog */
     char detail[40]; /* id / uid / key, for the result card */
     uint32_t id_hash; /* hash of the raw identity */
+    uint32_t freq; /* Sub-GHz: where it was heard */
 } Catch;
 
 Radio* radio_alloc(FuriMessageQueue* wake_queue);
@@ -464,6 +466,7 @@ typedef struct {
     bool card;
     bool leveled;
     bool messy; /* XP halved by static */
+    uint8_t band_pct; /* Sub-GHz frequency bonus, 100 = none */
 } CatchState;
 
 typedef enum {
@@ -646,6 +649,7 @@ void state_tick_minute(App* app);
 void state_add_xp(App* app, uint32_t xp);
 uint32_t state_game_xp(App* app, uint32_t want); /* applies the daily limit */
 const char* rank_name(uint8_t rank);
+uint8_t band_bonus_pct(uint32_t freq);
 #define GAME_XP_DAY 30
 void state_check_evolve(App* app);
 void state_add(int32_t* stat, int32_t milli);

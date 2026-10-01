@@ -650,6 +650,13 @@ static void draw_card(App* app, Canvas* c, int32_t y) {
         /* static halves the XP: say why */
         gfx_bmp(c, x + 46, y + 44, &bmp_glitch2);
         canvas_draw_str(c, x + 55, y + 50, "messy");
+    } else if(cs->band_pct > 100) {
+        /* heard on a rarer frequency: antenna + bonus */
+        char b[16];
+        snprintf(b, sizeof(b), "+%u%%", cs->band_pct - 100);
+        int32_t bw = canvas_string_width(c, b);
+        gfx_str_right(c, x + w - 4, y + 50, b);
+        gfx_bmp(c, x + w - 4 - bw - 9, y + 44, &bmp_src_subghz);
     } else {
         /* progress to the next level */
         SaveData* s = app->save;

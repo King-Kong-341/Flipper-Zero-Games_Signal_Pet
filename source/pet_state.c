@@ -71,7 +71,6 @@ const char* const nfc_names[12] = {
     "NXP SLIX",
     "ST25TB",
 };
-static const uint8_t nfc_rarity[12] = {1, 2, 1, 2, 2, 3, 1, 1, 2, 2, 2, 3};
 
 const char* const pet_names[] = {
     "Blip",  "Pixel", "Byte",  "Glitch", "Static", "Ping",  "Echo",  "Nibble",
@@ -161,64 +160,92 @@ uint32_t species_hash(uint8_t src, const char* proto) {
 
 /* ---------------------------------------------------------- catalog */
 
-static uint8_t subghz_rarity(const char* n) {
-    static const char* const rare[] = {
-        "KeeLoq",
-        "Star Line",
-        "Security+",
-        "Somfy",
-        "FloR",
-        "Faac",
-        "Alutech",
-        "Atomo",
-        "Twee",
-        "KingGates",
-        "Scher",
-        "Kia",
-        "Jarolift",
-        "Phoenix",
-        "Mastercode",
-        "Dooya",
-        "Nero Radio",
-        "BETT",
-    };
-    static const char* const common[] = {
-        "Princeton", "Holtek", "GateTX", "Linear", "Nice FLO", "Ansonic", "SMC5326", "Clemsa"};
-    for(size_t i = 0; i < sizeof(rare) / sizeof(rare[0]); i++)
-        if(strstr(n, rare[i])) return 3;
-    for(size_t i = 0; i < sizeof(common) / sizeof(common[0]); i++)
-        if(strstr(n, common[i])) return 1;
-    if(strcmp(n, "CAME") == 0) return 1;
-    return 2;
-}
+/* ---------------------------------------------------------- XP values */
 
-static uint8_t rfid_rarity(const char* n) {
-    if(strcmp(n, "EM4100") == 0 || strcmp(n, "H10301") == 0 || strcmp(n, "Indala26") == 0) return 1;
-    if(strstr(n, "FDX")) return 3; /* animal microchips */
-    return 2;
-}
+/* Every signal type has its own XP value: how often you meet it in daily
+ * life. Cheap 433 MHz remotes (Princeton) and TV remotes (NEC) are
+ * everywhere and give little; protocols that are built into few devices
+ * give a lot. Values are matched against the lower-case protocol name,
+ * more specific names first. */
+typedef struct {
+    const char* key;
+    uint8_t xp;
+} XpRule;
 
-static uint8_t ir_rarity(const char* n) {
-    static const char* const common[] = {"NEC", "NECext", "Samsung32", "RC5", "RC6", "SIRC", "Raw IR"};
-    for(size_t i = 0; i < sizeof(common) / sizeof(common[0]); i++)
-        if(strcmp(n, common[i]) == 0) return 1;
-    return 2;
-}
-
-/* Rank = how hard a signal is to find: the source matters (every home has
- * a TV remote, few people carry an iButton) and so does the protocol. */
-static const uint8_t rank_table[SrcCount][3] = {
-    {2, 3, 4}, /* Sub-GHz: Uncommon .. Epic */
-    {1, 2, 3}, /* NFC: Common .. Rare */
-    {2, 3, 4}, /* RFID: Uncommon .. Epic (animal chips) */
-    {1, 2, 3}, /* IR: Common .. Rare */
-    {3, 4, 5}, /* iButton: Rare .. Legendary */
+static const XpRule xp_subghz[] = {
+    {"kinggates", 97},   {"princeton", 17},   {"came twee", 44},   {"came atomo", 76}, {"came", 23},
+    {"gate", 31},        {"holtek_ht", 33},   {"holtek", 29},     {"intertechno", 37},
+    {"hormann", 38},     {"smc5326", 42},     {"dooya", 46},      {"keeloq", 47},
+    {"ansonic", 49},     {"marantec24", 69},  {"marantec", 54},   {"somfy keytis", 96},
+    {"somfy", 57},       {"nice flor", 71},   {"nice flo", 34},   {"power smart", 59},
+    {"delta", 61},       {"linear", 64},      {"faac", 62},       {"bett", 63},
+    {"clemsa", 66},      {"cham", 67},       {"legrand", 68},    {"honeywell", 72},
+    {"security+ 1", 73}, {"security+ 2", 79}, {"mastercode", 74}, {"roger", 77},
+    {"doitrand", 81},    {"nero sketch", 83}, {"nero radio", 86}, {"feron", 87},
+    {"phoenix", 88},     {"alutech", 89},     {"megacode", 91},   {"star line", 93},
+    {"magellan", 94},    {"dickert", 99},    {"hay21", 101},
+    {"ido", 102},        {"gangqi", 104},     {"scher", 108},     {"elplast", 109},
+    {"hollarm", 111},    {"revers", 115},     {"kia", 117},
 };
 
-static uint8_t rank_of(uint8_t src, uint8_t rarity) {
-    if(rarity < 1) rarity = 1;
-    if(rarity > 3) rarity = 3;
-    return rank_table[src % SrcCount][rarity - 1];
+static const XpRule xp_rfid[] = {
+    {"em4100/32", 47}, {"em4100/16", 52}, {"em4100", 18},    {"h10301", 26},  {"hidprox", 34},
+    {"indala", 39},    {"ioprox", 48},    {"awid", 51},      {"hidext", 58},  {"electra", 61},
+    {"fdx-b", 63},     {"pyramid", 67},   {"jablotron", 69}, {"idteck", 71},  {"viking", 74},
+    {"fdx-a", 76},     {"keri", 77},      {"paradox", 78},   {"securakey", 79}, {"pac", 82},
+    {"gallagher", 84}, {"nexwatch", 86},  {"gprox", 91},     {"noralsy", 93},
+};
+
+static const XpRule xp_ir[] = {
+    {"raw", 7},       {"necext", 11},  {"nec42ext", 49}, {"nec42", 46},  {"nec", 9},
+    {"samsung", 13},  {"rc5x", 37},    {"rc5", 17},      {"rc6", 21},    {"sirc20", 33},
+    {"sirc15", 27},   {"sirc", 19},    {"kaseikyo", 29}, {"rca", 41},    {"pioneer", 44},
+};
+
+static const XpRule xp_ibutton[] = {
+    {"ds1990", 54}, {"dsgeneric", 97}, {"ds1992", 112}, {"ds1971", 121},
+    {"ds1996", 128}, {"cyfral", 147},  {"metakom", 158},
+};
+
+/* same order as NfcProtocol */
+static const uint8_t xp_nfc[12] = {16, 57, 12, 52, 38, 96, 14, 18, 43, 31, 34, 88};
+static const uint8_t xp_default[SrcCount] = {58, 30, 60, 25, 100};
+
+static uint8_t xp_lookup(const XpRule* rules, size_t n, const char* name, uint8_t def) {
+    char low[32];
+    size_t i = 0;
+    for(; name[i] && i < sizeof(low) - 1; i++)
+        low[i] = (name[i] >= 'A' && name[i] <= 'Z') ? name[i] - 'A' + 'a' : name[i];
+    low[i] = '\0';
+    for(size_t k = 0; k < n; k++)
+        if(strstr(low, rules[k].key)) return rules[k].xp;
+    return def;
+}
+
+#define XP_RULES(r) r, sizeof(r) / sizeof(r[0])
+
+static uint8_t species_xp(uint8_t src, const char* name, uint8_t nfc_index) {
+    switch(src) {
+    case SrcSubGhz:
+        return xp_lookup(XP_RULES(xp_subghz), name, xp_default[src]);
+    case SrcNfc:
+        return nfc_index < 12 ? xp_nfc[nfc_index] : xp_default[src];
+    case SrcRfid:
+        return xp_lookup(XP_RULES(xp_rfid), name, xp_default[src]);
+    case SrcIr:
+        return xp_lookup(XP_RULES(xp_ir), name, xp_default[src]);
+    default:
+        return xp_lookup(XP_RULES(xp_ibutton), name, xp_default[src]);
+    }
+}
+
+/* Stars follow the XP value. */
+static uint8_t rank_from_xp(uint8_t xp) {
+    if(xp <= 22) return 1;
+    if(xp <= 45) return 2;
+    if(xp <= 75) return 3;
+    if(xp <= 105) return 4;
+    return 5;
 }
 
 const char* rank_name(uint8_t rank) {
@@ -226,17 +253,26 @@ const char* rank_name(uint8_t rank) {
     return names[rank > 5 ? 0 : rank];
 }
 
-/* XP per rank: a new species, a new signal of a known species, a re-catch */
-static const uint8_t xp_species[6] = {0, 15, 30, 60, 100, 160};
-static const uint8_t xp_signal[6] = {0, 4, 8, 15, 25, 40};
-static const uint8_t xp_snack[6] = {0, 1, 1, 2, 2, 3};
+/* Sub-GHz: 433.92 MHz is the busiest frequency, odd ones are a find. */
+uint8_t band_bonus_pct(uint32_t freq) {
+    uint32_t khz = freq / 1000;
+    if(khz >= 433870 && khz <= 433970) return 100;
+    if(khz >= 433050 && khz <= 434790) return 112;
+    if(khz >= 314900 && khz <= 315100) return 118;
+    if(khz >= 863000 && khz <= 870000) return 124;
+    if(khz >= 300000 && khz <= 348000) return 141;
+    if(khz >= 387000 && khz <= 464000) return 133;
+    if(khz >= 779000 && khz <= 928000) return 152;
+    return 100;
+}
 
-static void cat_add(Catalog* cat, uint8_t src, const char* name, uint8_t rarity) {
+static void cat_add(Catalog* cat, uint8_t src, const char* name, uint8_t nfc_index) {
     if(cat->n >= MAX_CATALOG || !name) return;
     CatEntry* e = &cat->e[cat->n++];
     e->name = name;
     e->src = src;
-    e->rarity = rank_of(src, rarity);
+    e->xp = species_xp(src, name, nfc_index);
+    e->rarity = rank_from_xp(e->xp);
     e->hash = species_hash(src, name);
     cat->count[src]++;
 }
@@ -251,34 +287,34 @@ void catalog_build(Catalog* cat) {
         if(!p || !p->name) continue;
         if(!(p->flag & SubGhzProtocolFlag_Decodable)) continue;
         if(strcmp(p->name, "RAW") == 0 || strcmp(p->name, "BinRAW") == 0) continue;
-        cat_add(cat, SrcSubGhz, p->name, subghz_rarity(p->name));
+        cat_add(cat, SrcSubGhz, p->name, 0);
     }
 
     cat->first[SrcNfc] = cat->n;
     for(uint8_t i = 0; i < 12; i++)
-        cat_add(cat, SrcNfc, nfc_names[i], nfc_rarity[i]);
+        cat_add(cat, SrcNfc, nfc_names[i], i);
 
     cat->first[SrcRfid] = cat->n;
     ProtocolDict* dict = protocol_dict_alloc(lfrfid_protocols, LFRFIDProtocolMax);
     for(size_t i = 0; i < LFRFIDProtocolMax; i++) {
         const char* n = protocol_dict_get_name(dict, i);
-        cat_add(cat, SrcRfid, n, rfid_rarity(n));
+        cat_add(cat, SrcRfid, n, 0);
     }
     protocol_dict_free(dict);
 
     cat->first[SrcIr] = cat->n;
     for(int i = 0; i < InfraredProtocolMAX; i++) {
         const char* n = infrared_get_protocol_name((InfraredProtocol)i);
-        cat_add(cat, SrcIr, n, ir_rarity(n));
+        cat_add(cat, SrcIr, n, 0);
     }
-    cat_add(cat, SrcIr, "Raw IR", 1);
+    cat_add(cat, SrcIr, "Raw IR", 0);
 
     cat->first[SrcIbutton] = cat->n;
     iButtonProtocols* ib = ibutton_protocols_alloc();
     uint32_t ibn = ibutton_protocols_get_protocol_count();
     for(uint32_t i = 0; i < ibn; i++) {
         const char* n = ibutton_protocols_get_name(ib, (iButtonProtocolId)i);
-        cat_add(cat, SrcIbutton, n, strstr(n, "DS") || strstr(n, "Dallas") ? 2 : 3);
+        cat_add(cat, SrcIbutton, n, 0);
     }
     ibutton_protocols_free(ib);
 }
@@ -612,28 +648,33 @@ void catch_digest(App* app, const Catch* c, CatchState* out) {
 
     int16_t ci = catalog_find(app->cat, sh);
     out->c = *c;
-    out->rarity = ci >= 0 ? app->cat->e[ci].rarity : 2;
-    if(out->rarity < 1 || out->rarity > 5) out->rarity = 2;
+    uint8_t base = ci >= 0 ? app->cat->e[ci].xp : xp_default[c->src % SrcCount];
+    out->rarity = rank_from_xp(base);
+    /* Sub-GHz: rarer frequencies are worth more */
+    out->band_pct = c->src == SrcSubGhz ? band_bonus_pct(c->freq) : 100;
+    uint32_t sxp = (uint32_t)base * out->band_pct / 100;
     out->dex_no = ci >= 0 ? (int16_t)(ci - app->cat->first[c->src] + 1) : 0;
 
     SpeciesRec* sp = species_get(s, sh);
     SpecimenRec* mr = specimen_get(s, mh);
-    uint8_t r = out->rarity;
 
     out->g_food = 0;
     out->g_joy = 0;
     if(!sp) {
         out->kind = CatchNewSpecies;
-        out->g_xp = xp_species[r];
+        out->g_xp = (int16_t)sxp;
     } else if(!mr) {
+        /* another remote / card of a type you already know */
         out->kind = CatchNewSignal;
-        out->g_xp = xp_signal[r];
+        out->g_xp = (int16_t)(sxp * 27 / 100);
+        if(out->g_xp < 2) out->g_xp = 2;
     } else if(now - mr->last_ts < STALE_SEC) {
         out->kind = CatchStale;
         out->g_xp = 0;
     } else {
         out->kind = CatchSnack;
-        out->g_xp = xp_snack[r];
+        out->g_xp = (int16_t)(sxp / 25);
+        if(out->g_xp < 1) out->g_xp = 1;
     }
     /* a messy room spoils the appetite: half XP */
     out->messy = s->noise >= 3 && out->g_xp > 0;

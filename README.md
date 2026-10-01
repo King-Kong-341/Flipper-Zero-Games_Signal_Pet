@@ -75,19 +75,24 @@ The bottom bar: **Hunt · Play · Clean · Sleep · Signal Dex · Logbook · Sta
 | **Infrared** | any TV or AC remote | aim at the **top** and press a button |
 | **iButton** | intercom keys (Dallas, Cyfral, Metakom) | touch the iButton contacts |
 
-- Every signal type has a **rank** — the harder it is to find, the more XP:
+- **Every signal type has its own XP value** — based on how often you meet
+  it in real life. Protocols built into millions of devices give little,
+  ones that hardly anybody uses give a lot. The value decides the stars:
 
-  | Rank | Examples | New species | New signal |
-  |---|---|:-:|:-:|
-  | ★ Common | TV remotes (NEC, Samsung), bank cards, NTAG stickers | 15 XP | 4 XP |
-  | ★★ Uncommon | rarer IR remotes, DESFire, EM4100 fobs, simple Sub-GHz remotes | 30 XP | 8 XP |
-  | ★★★ Rare | FeliCa, rarer 125 kHz tags, most Sub-GHz remotes | 60 XP | 15 XP |
-  | ★★★★ Epic | rolling-code car keys (KeeLoq …), animal microchips, Dallas iButtons | 100 XP | 25 XP |
-  | ★★★★★ Legendary | Cyfral and Metakom iButtons | 160 XP | 40 XP |
+  | Stars | Examples (XP for a new species) |
+  |---|---|
+  | ★ Common | Raw IR (AC remotes) 7 · NEC TV remotes 9 · bank cards 12 · NTAG stickers 14 · Princeton 433 MHz remotes 17 · EM4100 door fobs 18 |
+  | ★★ Uncommon | CAME gates 23 · HID badges 26 · GateTX 31 · MIFARE DESFire 31 · Hörmann garages 38 |
+  | ★★★ Rare | NEC42 remotes 46 · KeeLoq car keys 47 · DS1990 iButtons 54 · Somfy blinds 57 · FDX-B pet chips 63 · Nice FloR-S 71 |
+  | ★★★★ Epic | Security+ 2.0 garages 79 · Star Line car alarms 93 · Noralsy tags 93 · FeliCa cards 96 · KingGates 97 |
+  | ★★★★★ Legendary | Scher-Khan 108 · Hollarm 111 · KIA Seed 117 · Cyfral 147 · Metakom 158 |
 
-  A **new species** is a signal type you never had, a **new signal** is
-  another remote/card of a known type. Catching the same one again later
-  gives 1–3 XP, within 20 minutes it's "old news".
+- **Sub-GHz frequency bonus:** 433.92 MHz is the busiest frequency (no bonus).
+  Other 433/434 MHz channels give +12 %, 315 MHz +18 %, 868 MHz +24 %, odd
+  frequencies like 300, 390, 418 or 915 MHz up to **+52 %**.
+- A **new species** is a signal type you never had. Another remote or card
+  of a type you know gives about a quarter of its value, catching the same
+  one again later gives a little, within 20 minutes it's "old news".
 - **Sub-GHz "All" band:** the radio has one receiver, so it sniffs the signal
   strength of all 54 standard frequencies in a fast loop (about 0.2 s for
   all of them) and jumps onto any channel that lights up to decode it.
@@ -125,7 +130,8 @@ The bottom bar: **Hunt · Play · Clean · Sleep · Signal Dex · Logbook · Sta
 - 🎮 **3 mini games:** *Byte Catch* (catch falling packets, dodge static),
   *Tune In* (match your wave to the target on an oscilloscope) and
   *Freq Hopper* (hop between three radio bands, grab packets, dodge noise)
-- ⭐ **5 ranks** from Common to Legendary — rare signals are worth the hunt
+- ⭐ **Every signal type has its own XP value** (Common to Legendary) plus a
+  bonus for rare Sub-GHz frequencies — rare signals are worth the hunt
 - 🔊 **Sound, vibration & LED** — every source has its own LED colour
 - ⚙️ **Settings** with a one-line explanation for every option
 - 💾 Everything is saved on the SD card
@@ -135,7 +141,7 @@ The bottom bar: **Hunt · Play · Clean · Sleep · Signal Dex · Logbook · Sta
 | | | |
 |:-:|:-:|:-:|
 | <img src="images/home.png"> | <img src="images/hunt_subghz.png"> | <img src="images/catch_card.png"> |
-| The room | Sub-GHz hunt (all bands) | A legendary catch! |
+| The room | Sub-GHz hunt (all bands) | A rare catch with frequency bonus |
 | <img src="images/hunt_nfc.png"> | <img src="images/logbook.png"> | <img src="images/signal_dex.png"> |
 | NFC hunt | Logbook | Signal Dex |
 | <img src="images/profile.png"> | <img src="images/name_keyboard.png"> | <img src="images/hatch.png"> |

@@ -395,6 +395,8 @@ void dexd_draw(App* app, Canvas* c) {
     canvas_draw_str(c, x, 23, source_names[e->src]);
     gfx_stars(c, 97, 18, e->rarity);
     canvas_draw_str(c, x, 33, rank_name(e->rarity));
+    snprintf(buf, sizeof(buf), "%u XP", e->xp);
+    gfx_str_right(c, 126, 33, buf);
     if(!sp) {
         canvas_draw_str(c, x, 43, "Not found yet!");
         canvas_draw_str(c, x, 53, "Keep hunting...");
@@ -828,11 +830,11 @@ static const HelpPage help_pages[] = {
     {"WELCOME", {"Your pet lives on radio", "signals. Hunt them with", "Flipper's antennas to", "feed it and help it grow."}},
     {"HUNTING", {"Sub-GHz: keys, gates", "NFC: bank & transit cards", "RFID: door fobs, chips", "IR: remotes  iButton: keys"}},
     {"CARE", {"No hunger, it can't die.", "Rare signals = big XP!", "Static halves XP: Clean!", "Games: max 30 XP a day."}},
-    {"RANKS", {"New species gives XP:", "Common 15  Uncommon 30", "Rare 60     Epic 100", "Legendary 160 XP!"}},
+    {"RANKS", {"Every signal type has its", "own XP: common ones few,", "rare ones up to 158 XP.", "Odd Sub-GHz bands: bonus!"}},
     {"GROWING", {"Lv 5: teen, Lv 10: adult.", "Its diet decides which", "of 6 forms it becomes.", "New moves up to Lv 99!"}},
     {"EXTRAS", {"Band All sweeps every", "Sub-GHz band for you.", "CC1101 board on GPIO:", "used for Sub-GHz hunts"}},
     {"CONTROLS", {"Left/Right: pick in dock", "OK: open    Up: pet it", "Down: chat  Back: exit", "Logbook: every catch"}},
-    {"ABOUT", {"Signal Pet v1.1", "Made by King-Kong-341", "for the Flipper Zero.", "Happy hunting!"}},
+    {"ABOUT", {"Signal Pet v1.2", "Made by King-Kong-341", "for the Flipper Zero.", "Happy hunting!"}},
 };
 #define HELP_N (sizeof(help_pages) / sizeof(help_pages[0]))
 
