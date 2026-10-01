@@ -1,0 +1,13 @@
+App(
+    appid="signal_pet",
+    name="Signal Pet",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="signal_pet_app",
+    requires=["gui", "storage", "notification"],
+    stack_size=6 * 1024,
+    fap_category="Games",
+    fap_icon="icon.png",
+    fap_version="1.0",
+    fap_description="A virtual pet that lives on the radio signals around you. Feed it Sub-GHz remotes, NFC cards, RFID tags, IR remotes and iButton keys, watch it grow and evolve.",
+    fap_author="King-Kong-341",
+)
