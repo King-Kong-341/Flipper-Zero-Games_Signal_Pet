@@ -18,7 +18,8 @@ static void tone_next(App* app, uint32_t now) {
     const Tone* t = &fx->tones[fx->tone_i++];
     if(fx->speaker) {
         if(t->f)
-            furi_hal_speaker_start((float)t->f, (float)t->vol / 100.0f);
+            furi_hal_speaker_start(
+                (float)t->f, (float)t->vol / 100.0f * (float)app->save->set.sound / 10.0f);
         else
             furi_hal_speaker_stop();
     }

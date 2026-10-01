@@ -112,7 +112,7 @@ extern const char* const move_names[TIER_MAX];
 /* ------------------------------------------------------------ save file */
 
 #define SAVE_MAGIC 0x54455053u /* "SPET" */
-#define SAVE_VERSION 4
+#define SAVE_VERSION 5
 #define SAVE_V2_SIZE 5088
 #define SAVE_V1_SIZE 5076 /* v1 files load too; new fields start zeroed */
 #define MAX_SPECIES 200
@@ -165,7 +165,7 @@ typedef enum {
 } Band;
 
 typedef struct {
-    uint8_t sound;
+    uint8_t sound; /* volume 0 (off) .. 10 (100 %) */
     uint8_t vibro;
     uint8_t led;
     uint8_t backlight; /* 1 = always on while the app is open */
@@ -212,7 +212,7 @@ typedef struct {
     uint32_t games_xp;
     uint8_t gadgets; /* bit 0: external CC1101 module seen */
     uint8_t pad2;
-    uint16_t best_hop;
+    uint16_t unused_c; /* kept for older saves */
     /* ---- v3 ---- */
     uint32_t sleep_ts; /* when it fell asleep (dream bonus) */
     uint32_t last_catch_ts;
@@ -357,7 +357,6 @@ typedef enum {
     ScenePlayPick,
     SceneGameCatch,
     SceneGameTune,
-    SceneGameHop,
     SceneGameOver,
     SceneDex,
     SceneDexDetail,
@@ -535,10 +534,6 @@ typedef struct {
     uint32_t lock_t0;
     uint8_t locked;
     float phase;
-    /* freq hopper */
-    uint8_t lane;
-    float lane_y;
-    uint32_t dist_t;
     /* result */
     bool capped; /* daily game XP limit reached */
     bool finished;
@@ -806,10 +801,6 @@ void gcatch_enter(App* app);
 void gcatch_input(App* app, InputEvent* ev);
 void gcatch_update(App* app, uint32_t dt);
 void gcatch_draw(App* app, Canvas* c);
-void hop_enter(App* app);
-void hop_input(App* app, InputEvent* ev);
-void hop_update(App* app, uint32_t dt);
-void hop_draw(App* app, Canvas* c);
 void gtune_enter(App* app);
 void gtune_input(App* app, InputEvent* ev);
 void gtune_update(App* app, uint32_t dt);

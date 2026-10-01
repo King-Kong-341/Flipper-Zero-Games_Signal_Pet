@@ -62,7 +62,6 @@ static const uint32_t sweep_freq[] = {
  * a fast loop (like the Frequency Analyzer: ~2 ms per channel, the whole
  * list in about 0.2 s) and jumps onto any channel that lights up to
  * decode it there. */
-#define SWEEP_PER_TICK 9 /* channels sniffed per frame */
 #define SWEEP_SETTLE_US 1800 /* RSSI needs a moment after retuning */
 #define SWEEP_HOLD_MS 2500 /* max time decoding one channel */
 #define SWEEP_QUIET_MS 450 /* leave a channel this long after it went quiet */
@@ -104,9 +103,14 @@ struct Radio {
     uint32_t hop_t;
     uint32_t sweep[SWEEP_MAX]; /* the frequencies this radio accepts */
     uint8_t sweep_n;
-    bool hold; /* locked on a busy channel, decoder running */
+    volatile bool hold; /* locked on a busy channel, decoder running */
     uint32_t hold_t;
     uint32_t strong_t; /* last time the locked channel was loud */
+    FuriThread* sweep_thread;
+    volatile bool sweep_run;
+    volatile bool decoded; /* a decoder recognised the locked signal */
+    float peak;
+    uint32_t lock_base;
     float rssi;
     bool ext; /* using the external module */
     bool otg_ours; /* we switched on 5V for it */
@@ -199,6 +203,7 @@ static void subghz_cb(SubGhzReceiver* receiver, SubGhzProtocolDecoderBase* decod
         }
         c.id_hash = h;
         c.freq = r->freq;
+        r->decoded = true;
         set_pending(r, &c);
     }
     subghz_receiver_reset(receiver);
@@ -231,37 +236,126 @@ static float sweep_probe(Radio* r, uint32_t freq) {
     return subghz_devices_get_rssi(r->dev);
 }
 
-static void subghz_sweep_tick(Radio* r) {
-    uint32_t now = furi_get_tick();
-    if(r->hold) {
-        /* locked on a channel: let the decoder work while it stays loud */
-        r->rssi = subghz_devices_get_rssi(r->dev);
-        if(r->rssi > SWEEP_RSSI_BUSY - 6.0f) r->strong_t = now;
-        if(r->paused) return; /* a catch is on screen */
-        if(now - r->hold_t > SWEEP_HOLD_MS || now - r->strong_t > SWEEP_QUIET_MS) {
+static const char* mystery_name(uint32_t freq) {
+    if(freq < 360000000) return "Mystery 315";
+    if(freq < 600000000) return "Mystery 433";
+    return "Mystery 868";
+}
+
+/* Something was on air but no decoder knew it: it still counts. */
+static void mystery_catch(Radio* r, uint32_t freq, float peak) {
+    Catch c;
+    memset(&c, 0, sizeof(c));
+    c.src = SrcSubGhz;
+    strncpy(c.proto, mystery_name(freq), sizeof(c.proto) - 1);
+    uint32_t bucket = freq / 50000; /* same transmitter = same 50 kHz slot */
+    c.id_hash = hash_bytes(hash_str(2166136261u, c.proto), (const uint8_t*)&bucket, sizeof(bucket));
+    c.freq = freq;
+    snprintf(
+        c.detail,
+        sizeof(c.detail),
+        "%lu.%02lu MHz %d dBm",
+        (unsigned long)(freq / 1000000),
+        (unsigned long)(freq % 1000000) / 10000,
+        (int)peak);
+    set_pending(r, &c);
+}
+
+/* Like the Frequency Analyzer: sniff every channel's signal strength in a
+ * tight loop (~0.1 s for the whole list), on a hit search the exact
+ * frequency in 25 kHz steps around it, then listen there with the
+ * decoders. Runs in its own thread so the screen stays smooth. */
+static int32_t sweep_thread(void* ctx) {
+    Radio* r = ctx;
+    uint32_t muted_f = 0, muted_until = 0; /* a channel that never shuts up */
+    while(r->sweep_run) {
+        if(r->paused && !r->hold) {
+            furi_delay_ms(20);
+            continue;
+        }
+        uint32_t now = furi_get_tick();
+        if(!r->hold) {
+            /* coarse pass over all channels */
+            float best = -130.0f;
+            uint32_t best_f = 0;
+            for(uint8_t i = 0; i < r->sweep_n && r->sweep_run && !r->paused; i++) {
+                r->hop_i = i;
+                uint32_t f = r->sweep[i];
+                r->freq = f;
+                if(f == muted_f && (int32_t)(furi_get_tick() - muted_until) < 0) continue;
+                float rssi = sweep_probe(r, f);
+                if(rssi > best) {
+                    best = rssi;
+                    best_f = f;
+                }
+            }
+            r->rssi = best;
+            if(!r->sweep_run || r->paused || best < SWEEP_RSSI_BUSY || !best_f) continue;
+            /* fine pass around the peak */
+            uint32_t fine_f = best_f;
+            for(int32_t d = -200000; d <= 200000; d += 25000) {
+                uint32_t f = (uint32_t)((int32_t)best_f + d);
+                if(!subghz_devices_is_frequency_valid(r->dev, f)) continue;
+                float rssi = sweep_probe(r, f);
+                if(rssi > best) {
+                    best = rssi;
+                    fine_f = f;
+                }
+            }
+            /* lock on and let the decoders listen */
+            subghz_rx_start(r, fine_f);
+            r->freq = fine_f;
+            r->lock_base = best_f;
+            r->hold = true;
+            r->hold_t = furi_get_tick();
+            r->strong_t = r->hold_t;
+            r->peak = best;
+            r->decoded = false;
+            continue;
+        }
+        /* locked */
+        furi_delay_ms(25);
+        now = furi_get_tick();
+        float rssi = subghz_devices_get_rssi(r->dev);
+        r->rssi = rssi;
+        if(rssi > SWEEP_RSSI_BUSY - 6.0f) r->strong_t = now;
+        if(rssi > r->peak) r->peak = rssi;
+        if(r->paused) continue; /* a catch is on screen */
+        bool quiet = now - r->strong_t > SWEEP_QUIET_MS;
+        bool timeout = now - r->hold_t > SWEEP_HOLD_MS;
+        if(quiet || timeout) {
             subghz_rx_stop(r);
             r->hold = false;
-        }
-        return;
-    }
-    if(r->paused) return;
-    float best = -120.0f;
-    for(uint8_t k = 0; k < SWEEP_PER_TICK; k++) {
-        r->hop_i = (r->hop_i + 1) % r->sweep_n;
-        uint32_t f = r->sweep[r->hop_i];
-        float rssi = sweep_probe(r, f);
-        if(rssi > best) best = rssi;
-        if(rssi > SWEEP_RSSI_BUSY) {
-            /* something is on air here: jump on it and decode */
-            subghz_rx_start(r, f);
-            r->hold = true;
-            r->hold_t = now;
-            r->strong_t = now;
-            break;
+            uint32_t heard = r->strong_t - r->hold_t;
+            if(timeout && !quiet) {
+                /* still loud after the whole hold: a constant carrier or
+                 * interference, not a remote - ignore it for a minute */
+                muted_f = r->lock_base;
+                muted_until = now + 60000;
+            } else if(!r->decoded && heard >= 120) {
+                mystery_catch(r, r->freq, r->peak);
+            }
         }
     }
-    r->freq = r->sweep[r->hop_i];
-    r->rssi = best;
+    return 0;
+}
+
+static void sweep_begin(Radio* r) {
+    if(r->sweep_thread || r->band != BandHop || r->sweep_n < 2) return;
+    r->hold = false;
+    r->sweep_run = true;
+    r->sweep_thread = furi_thread_alloc_ex("SignalPetSweep", 2048, sweep_thread, r);
+    furi_thread_start(r->sweep_thread);
+}
+
+static void sweep_end(Radio* r) {
+    if(!r->sweep_thread) return;
+    r->sweep_run = false;
+    furi_thread_join(r->sweep_thread);
+    furi_thread_free(r->sweep_thread);
+    r->sweep_thread = NULL;
+    if(r->hold) subghz_rx_stop(r);
+    r->hold = false;
 }
 
 static bool subghz_start(Radio* r) {
@@ -314,14 +408,17 @@ static bool subghz_start(Radio* r) {
         if(subghz_devices_is_frequency_valid(r->dev, sweep_freq[i])) r->sweep[r->sweep_n++] = sweep_freq[i];
     r->hop_i = 0;
     r->hold = false;
-    if(r->band == BandHop && r->sweep_n > 1)
-        r->freq = r->sweep[0]; /* sweeping starts in radio_tick */
-    else
+    if(r->band == BandHop && r->sweep_n > 1) {
+        r->freq = r->sweep[0];
+        sweep_begin(r);
+    } else {
         subghz_rx_start(r, band_freq[r->band % 3]);
+    }
     return true;
 }
 
 static void subghz_stop(Radio* r) {
+    sweep_end(r);
     if(r->dev) {
         subghz_rx_stop(r);
         subghz_devices_sleep(r->dev);
@@ -771,10 +868,14 @@ void radio_stop(Radio* r) {
 void radio_set_band(Radio* r, uint8_t band) {
     r->band = band;
     if(!r->running || r->src != SrcSubGhz || !r->dev) return;
+    sweep_end(r);
     subghz_rx_stop(r);
     r->hop_i = 0;
     r->hold = false;
-    if(!(band == BandHop && r->sweep_n > 1)) subghz_rx_start(r, band_freq[band % 3]);
+    if(band == BandHop && r->sweep_n > 1)
+        sweep_begin(r);
+    else
+        subghz_rx_start(r, band_freq[band % 3]);
 }
 
 void radio_tick(Radio* r) {
@@ -782,11 +883,8 @@ void radio_tick(Radio* r) {
     switch(r->src) {
     case SrcSubGhz:
         if(!r->dev) break;
-        if(r->band != BandHop || r->sweep_n < 2) {
-            r->rssi = subghz_devices_get_rssi(r->dev);
-        } else {
-            subghz_sweep_tick(r);
-        }
+        /* the sweep thread keeps rssi/freq up to date in band "All" */
+        if(!r->sweep_thread) r->rssi = subghz_devices_get_rssi(r->dev);
         break;
     case SrcNfc:
         rnfc_tick(r);

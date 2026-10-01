@@ -93,11 +93,16 @@ The bottom bar: **Hunt · Play · Clean · Sleep · Signal Dex · Logbook · Sta
 - A **new species** is a signal type you never had. Another remote or card
   of a type you know gives about a quarter of its value, catching the same
   one again later gives a little, within 20 minutes it's "old news".
-- **Sub-GHz "All" band:** the radio has one receiver, so it sniffs the signal
-  strength of all 54 standard frequencies in a fast loop (about 0.2 s for
-  all of them) and jumps onto any channel that lights up to decode it.
-  Tip: hold the button of your remote for 1–2 seconds. You can also lock
-  onto 433, 868 or 315 MHz with ◀ ▶.
+- **Sub-GHz "All" band — works like the Frequency Analyzer:** a background
+  scanner measures the signal strength of all 54 standard frequencies about
+  nine times per second. When one lights up, it searches the exact frequency
+  in 25 kHz steps and listens there with all the decoders. Tip: hold the
+  button of your remote for 1–2 seconds. You can also lock onto 433, 868 or
+  315 MHz with ◀ ▶.
+- **Mystery signals:** something transmitted but no decoder knows it? It
+  still counts — you catch a *Mystery 315 / 433 / 868* with its frequency and
+  signal strength. Channels that never stop transmitting (interference) are
+  ignored.
 - **External CC1101 board** (e.g. the Rabbit-Labs *Flux Capacitor*) on the
   GPIO header? Signal Pet finds it automatically ("Board: CC1101") and uses
   it for Sub-GHz hunts — the first time gives a gadget bonus.
@@ -127,12 +132,12 @@ The bottom bar: **Hunt · Play · Clean · Sleep · Signal Dex · Logbook · Sta
   lights off when your pet sleeps
 - 📖 **Signal Dex** with every signal type your firmware can decode, **Logbook** of the last 40
   catches with time and ID, **16 badges**, stats
-- 🎮 **3 mini games:** *Byte Catch* (catch falling packets, dodge static),
-  *Tune In* (match your wave to the target on an oscilloscope) and
-  *Freq Hopper* (hop between three radio bands, grab packets, dodge noise)
+- 🎮 **2 mini games:** *Byte Catch* (catch falling packets, dodge static) and
+  *Tune In* (match your wave to the target on an oscilloscope)
 - ⭐ **Every signal type has its own XP value** (Common to Legendary) plus a
   bonus for rare Sub-GHz frequencies — rare signals are worth the hunt
-- 🔊 **Sound, vibration & LED** — every source has its own LED colour
+- 🔊 **Volume slider** (10 % steps), vibration & LED — every source has its
+  own LED colour
 - ⚙️ **Settings** with a one-line explanation for every option
 - 💾 Everything is saved on the SD card
 
@@ -146,10 +151,8 @@ The bottom bar: **Hunt · Play · Clean · Sleep · Signal Dex · Logbook · Sta
 | NFC hunt | Logbook | Signal Dex |
 | <img src="images/profile.png"> | <img src="images/name_keyboard.png"> | <img src="images/hatch.png"> |
 | A level 99 legend | Name keyboard | Hatching the egg |
-| <img src="images/games.png"> | <img src="images/freq_hopper.png"> | <img src="images/tune_in.png"> |
-| Mini games | Freq Hopper | Tune In |
-| <img src="images/gpio_board.png"> | | |
-| External board found | | |
+| <img src="images/games.png"> | <img src="images/tune_in.png"> | <img src="images/gpio_board.png"> |
+| Mini games | Tune In | External board found |
 
 ## 🛠 Build it yourself
 

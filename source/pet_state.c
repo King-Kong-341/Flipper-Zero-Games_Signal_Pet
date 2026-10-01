@@ -173,6 +173,8 @@ typedef struct {
 } XpRule;
 
 static const XpRule xp_subghz[] = {
+    /* heard but not decodable (see the sweep in pet_radio.c) */
+    {"mystery 433", 12}, {"mystery 315", 14}, {"mystery 868", 19},
     {"kinggates", 97},   {"princeton", 17},   {"came twee", 44},   {"came atomo", 76}, {"came", 23},
     {"gate", 31},        {"holtek_ht", 33},   {"holtek", 29},     {"intertechno", 37},
     {"hormann", 38},     {"smc5326", 42},     {"dooya", 46},      {"keeloq", 47},
@@ -289,6 +291,9 @@ void catalog_build(Catalog* cat) {
         if(strcmp(p->name, "RAW") == 0 || strcmp(p->name, "BinRAW") == 0) continue;
         cat_add(cat, SrcSubGhz, p->name, 0);
     }
+    cat_add(cat, SrcSubGhz, "Mystery 315", 0); /* 300-348 MHz, undecoded */
+    cat_add(cat, SrcSubGhz, "Mystery 433", 0); /* 387-464 MHz */
+    cat_add(cat, SrcSubGhz, "Mystery 868", 0); /* 779-928 MHz */
 
     cat->first[SrcNfc] = cat->n;
     for(uint8_t i = 0; i < 12; i++)
@@ -424,7 +429,7 @@ void state_defaults(SaveData* s) {
     s->magic = SAVE_MAGIC;
     s->version = SAVE_VERSION;
     s->size = sizeof(SaveData);
-    s->set.sound = 1;
+    s->set.sound = 7;
     s->set.vibro = 1;
     s->set.led = 1;
     s->set.backlight = 1;
@@ -462,9 +467,10 @@ void state_load(App* app) {
             ok = n == SAVE_V1_SIZE && s->size == SAVE_V1_SIZE; /* upgrade */
         else if(s->magic == SAVE_MAGIC && s->version == 2)
             ok = n == SAVE_V2_SIZE && s->size == SAVE_V2_SIZE; /* upgrade */
-        else if(s->magic == SAVE_MAGIC && s->version == 3)
+        else if(s->magic == SAVE_MAGIC && (s->version == 3 || s->version == 4))
             ok = n == sizeof(SaveData) && s->size == sizeof(SaveData); /* same layout */
         if(ok && s->version < 4) s->set.band = BandHop; /* v1.2: sweep all bands */
+        if(ok && s->version < 5 && s->set.sound) s->set.sound = 7; /* on/off became a volume */
         if(ok) {
             s->version = SAVE_VERSION;
             s->size = sizeof(SaveData);
@@ -481,6 +487,7 @@ void state_load(App* app) {
     if(s->specimens_n > MAX_SPECIMENS) s->specimens_n = MAX_SPECIMENS;
     if(s->set.band >= BandCount) s->set.band = BandEU433;
     if(s->set.pace > PaceIntense) s->set.pace = PaceNormal;
+    if(s->set.sound > 10) s->set.sound = 10;
     if(s->log_n > LOG_N) s->log_n = LOG_N;
     s->log_next %= LOG_N;
 }

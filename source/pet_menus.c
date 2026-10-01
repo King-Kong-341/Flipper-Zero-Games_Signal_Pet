@@ -537,12 +537,7 @@ static void stats_records(App* app, Canvas* c) {
             break;
         case 3:
             snprintf(
-                buf,
-                sizeof(buf),
-                "%lu/%lu/%u",
-                (unsigned long)s->best_catch,
-                (unsigned long)s->best_tune,
-                s->best_hop);
+                buf, sizeof(buf), "%lu / %lu", (unsigned long)s->best_catch, (unsigned long)s->best_tune);
             break;
         default: {
             uint32_t d = state_age_days(app);
@@ -641,7 +636,7 @@ static const char* const set_labels[SetCount] = {
 
 /* one plain-English line per setting, shown under the list */
 static const char* const set_help[SetCount] = {
-    "Beeps and little songs",
+    "Volume, OK = mute",
     "Buzz on big moments",
     "Colored light on hunts",
     "Keep the screen bright",
@@ -656,7 +651,7 @@ void settings_enter(App* app) {
     s->sel = 0;
     s->top = 0;
     Settings* st = &app->save->set;
-    s->knob[0] = st->sound;
+    s->knob[0] = 0; /* sound is a volume slider, no switch */
     s->knob[1] = st->vibro;
     s->knob[2] = st->led;
 }
@@ -666,7 +661,13 @@ static void settings_change(App* app, int8_t dir) {
     Settings* st = &app->save->set;
     switch(ss->sel) {
     case SetSound:
-        st->sound ^= 1;
+        /* Left/Right: volume in 10 % steps, OK: mute / unmute */
+        if(dir == 0)
+            st->sound = st->sound ? 0 : 7;
+        else if(dir < 0 && st->sound > 0)
+            st->sound--;
+        else if(dir > 0 && st->sound < 10)
+            st->sound++;
         if(!st->sound) fx_stop_all(app);
         break;
     case SetVibro:
@@ -683,7 +684,7 @@ static void settings_change(App* app, int8_t dir) {
             st->backlight ? &sequence_display_backlight_enforce_on : &sequence_display_backlight_enforce_auto);
         break;
     case SetBand:
-        st->band = (st->band + BandCount + dir) % BandCount;
+        st->band = (st->band + BandCount + (dir ? dir : 1)) % BandCount;
         break;
     case SetName:
         name_enter(app, false);
@@ -721,7 +722,7 @@ void settings_input(App* app, InputEvent* ev) {
         break;
     case InputKeyOk:
         if(ev->type == InputTypeShort) {
-            settings_change(app, 1);
+            settings_change(app, 0);
             fx_click(app);
         }
         break;
@@ -741,7 +742,7 @@ void settings_input(App* app, InputEvent* ev) {
 void settings_update(App* app, uint32_t dt) {
     SettingsState* s = &app->settings;
     Settings* st = &app->save->set;
-    uint8_t v[3] = {st->sound, st->vibro, st->led};
+    uint8_t v[3] = {0, st->vibro, st->led};
     float k = (float)dt * 0.02f;
     if(k > 1) k = 1;
     for(uint8_t i = 0; i < 3; i++)
@@ -781,7 +782,19 @@ void settings_draw(App* app, Canvas* c) {
         canvas_draw_str(c, 3, y + 8, set_labels[i]);
         const char* val = NULL;
         switch(i) {
-        case SetSound:
+        case SetSound: {
+            /* volume slider + percent */
+            canvas_draw_rframe(c, 48, y + 2, 35, 6, 2);
+            int32_t fw = st->sound * 31 / 10;
+            if(fw > 0) canvas_draw_box(c, 50, y + 4, fw, 2);
+            static char vol[8];
+            if(st->sound)
+                snprintf(vol, sizeof(vol), "%u%%", st->sound * 10);
+            else
+                snprintf(vol, sizeof(vol), "Off");
+            val = vol;
+            break;
+        }
         case SetVibro:
         case SetLed:
             toggle(c, 105, y + 1, s->knob[i], sel);
@@ -834,7 +847,7 @@ static const HelpPage help_pages[] = {
     {"GROWING", {"Lv 5: teen, Lv 10: adult.", "Its diet decides which", "of 6 forms it becomes.", "New moves up to Lv 99!"}},
     {"EXTRAS", {"Band All sweeps every", "Sub-GHz band for you.", "CC1101 board on GPIO:", "used for Sub-GHz hunts"}},
     {"CONTROLS", {"Left/Right: pick in dock", "OK: open    Up: pet it", "Down: chat  Back: exit", "Logbook: every catch"}},
-    {"ABOUT", {"Signal Pet v1.2", "Made by King-Kong-341", "for the Flipper Zero.", "Happy hunting!"}},
+    {"ABOUT", {"Signal Pet v1.3", "Made by King-Kong-341", "for the Flipper Zero.", "Happy hunting!"}},
 };
 #define HELP_N (sizeof(help_pages) / sizeof(help_pages[0]))
 

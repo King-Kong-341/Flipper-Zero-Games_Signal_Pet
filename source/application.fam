@@ -7,7 +7,7 @@ App(
     stack_size=6 * 1024,
     fap_category="Games",
     fap_icon="icon.png",
-    fap_version="1.2",
+    fap_version="1.3",
     fap_description="A virtual pet that lives on the radio signals around you. Feed it Sub-GHz remotes, NFC cards, RFID tags, IR remotes and iButton keys, watch it grow and evolve.",
     fap_author="King-Kong-341",
 )

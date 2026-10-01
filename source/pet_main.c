@@ -47,9 +47,6 @@ static void scene_enter(App* app, Scene s) {
     case SceneGameTune:
         gtune_enter(app);
         break;
-    case SceneGameHop:
-        hop_enter(app);
-        break;
     case SceneDex:
         if(old != SceneDexDetail) dex_enter(app);
         break;
@@ -192,9 +189,6 @@ static void dispatch_input(App* app, InputEvent* ev) {
     case SceneGameTune:
         gtune_input(app, ev);
         break;
-    case SceneGameHop:
-        hop_input(app, ev);
-        break;
     case SceneGameOver:
         gover_input(app, ev);
         break;
@@ -256,9 +250,6 @@ static void dispatch_update(App* app, uint32_t dt) {
     case SceneGameTune:
         gtune_update(app, dt);
         break;
-    case SceneGameHop:
-        hop_update(app, dt);
-        break;
     case SceneDex:
         dex_update(app, dt);
         break;
@@ -313,9 +304,6 @@ static void render_callback(Canvas* c, void* ctx) {
         break;
     case SceneGameTune:
         gtune_draw(app, c);
-        break;
-    case SceneGameHop:
-        hop_draw(app, c);
         break;
     case SceneGameOver:
         gover_draw(app, c);
